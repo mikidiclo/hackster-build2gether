@@ -61,8 +61,6 @@ void setup() {
 void timerInterrupt() {
   /* Get sensor data */
   aht.getEvent(&humidity, &temp);
-  // float temperature = temp.temperature;
-  // int humidity = humidity.relative_humidity;
   /* Notecard: Send to Notehub */
   J *req = notecard.newRequest("note.add");
   if (req != NULL)
