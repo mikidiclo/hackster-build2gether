@@ -11,6 +11,7 @@
 #include <zephyr/device.h>
 
 #include <zephyr/drivers/uart.h>
+#include <drivers/sensor.h>
 
 #include "input_data.h"
 
@@ -124,12 +125,54 @@ static void result_ready_cb(int err)
 	if (err) {
 		printk("Edge Impulse cannot clear data (err: %i)\n", err);
 	}
-
 }
+
+/* Ultrasonic sensor */
+static int measure(const struct device *dev)
+{
+    int ret;
+    struct sensor_value distance;
+
+    ret = sensor_sample_fetch_chan(dev, SENSOR_CHAN_ALL);
+    switch (ret) {
+    case 0:
+        ret = sensor_channel_get(dev, SENSOR_CHAN_DISTANCE, &distance);
+        if (ret) {
+            printk("sensor_channel_get failed ret %d", ret);
+            return ret;
+        }
+        printk("%s: %d.%03dM", dev->name, distance.val1, (distance.val2 / 1000));
+		// Send data through serial port
+		char command[] = "off"
+		if (distance.val1 < 3) {
+			int ret = uart_tx(uart, command, sizeof(command), SYS_FOREVER_US);
+			if (ret) {
+				printk("UART sent data failed (err: %d)\n", ret);
+				return;
+			} 
+		}
+        break;
+    case -EIO:
+        printk("%s: Could not read device", dev->name);
+        break;
+    default:
+        printk("Error when reading device: %s", dev->name);
+        break;
+    }
+    return 0;
+}
+
 
 int main(void)
 {
 	int ret;
+	/* Init HC-SR04 */
+	const struct device *const us0 = DEVICE_DT_GET(DT_NODELABEL(us0));
+	if (!device_is_ready(us0)) {
+		printf("HC-SR04 failed to init (err: %s)\n", us0->name);
+		return 0;
+	}
+
 	/* Check UART init*/
 	if (!device_is_ready(uart)) {
 		printk("UART failed to init (err: %s)\n", uart->name);
